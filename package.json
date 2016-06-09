@@ -1,0 +1,25 @@
+{
+  "name": "sapling",
+  "version": "0.0.1",
+  "description": "A tiny Elm-inspired state manager",
+  "main": "build/index.js",
+  "scripts": {
+    "dev": "babel --watch=./src --out-dir=./build --presets es2015,stage-0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bbarr/sapling.git"
+  },
+  "author": "Brendan Barr",
+  "license": "SEE LICENSE IN LICENSE",
+  "bugs": {
+    "url": "https://github.com/bbarr/sapling/issues"
+  },
+  "homepage": "https://github.com/bbarr/sapling#readme",
+  "devDependencies": {
+    "babel-cli": "^6.9.0",
+    "babel-core": "^6.9.1",
+    "babel-preset-es2015": "^6.9.0",
+    "babel-preset-stage-0": "^6.5.0"
+  }
+}
