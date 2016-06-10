@@ -1,2 +1,2 @@
 # sapling
-A tiny Elm-inspired state manager
+A minimal Elm-inspired state manager with zero dependencies.
