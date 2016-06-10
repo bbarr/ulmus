@@ -1,5 +1,5 @@
 {
-  "name": "sapling",
+  "name": "ulmus",
   "version": "0.0.1",
   "description": "A tiny Elm-inspired state manager",
   "main": "build/index.js",
@@ -8,14 +8,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bbarr/sapling.git"
+    "url": "git+https://github.com/bbarr/ulmus.git"
   },
   "author": "Brendan Barr",
   "license": "SEE LICENSE IN LICENSE",
   "bugs": {
-    "url": "https://github.com/bbarr/sapling/issues"
+    "url": "https://github.com/bbarr/ulmus/issues"
   },
-  "homepage": "https://github.com/bbarr/sapling#readme",
+  "homepage": "https://github.com/bbarr/ulmus#readme",
   "devDependencies": {
     "babel-cli": "^6.9.0",
     "babel-core": "^6.9.1",
