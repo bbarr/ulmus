@@ -20,3 +20,5 @@ export const difference = (arr1, arr2) => {
 			[ ...diff, item ] : diff
 	}, [])
 }
+
+export const isArray = x => x instanceof Array

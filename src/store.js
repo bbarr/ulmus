@@ -3,6 +3,8 @@ import Reaction from  './reaction'
 import Effect from './effect'
 import Action from './action'
 
+import { isArray } from './util'
+
 const assert = (condition, errorMsg) => {
 	if (!condition) throw new Error(errorMsg)
 }
@@ -15,15 +17,21 @@ const createStore = ({
 	validate, 
 	init 
 }, onUpdate) => {
+
 	assert(typeof init === 'function', '1st argument: Must provide an `init` function as part of object')
 	assert(typeof buildUpdate === 'function', '1st argument: Must provide an `update` function as part of object')
 	assert(typeof onUpdate === 'function', '2nd argument: must be a function')
 
 	let state = init()
+	let isDispatching = false
 
 	const dispatch = action => {
+
+		assert(!isDispatching, 'Cannot call action synchronously during dispatch/render cycle')
+		isDispatching = true
 			
-		const [ newState, cmd ] = reduce(state, action)
+		const reduced = reduce(state, action)
+		const [ newState, cmd ] = isArray(reduced) ? reduced : [ reduced, effects.none() ]
 
 		const errors = validate && validate(newState)
 		assert(!errors, 'Invalid state: ' + JSON.stringify(errors))
@@ -42,16 +50,18 @@ const createStore = ({
 		}
 
 		// possible action call
-		react(newState, state, actions)
+		setTimeout(() => react(newState, state, actions), 0)
 
 		// update existing state
 		state = newState
 		
 		onUpdate(context)
+
+		isDispatching = false
 	}
 
-	const effects = { ...(rawEffects || {}), none: Effect('none', () => true) }
-	const actions = Action.arm(rawActions || {}, dispatch)
+	const effects = { ...Effect.fromObject(rawEffects || {}), none: Effect('none', () => true) }
+	const actions = Action.arm(Action.fromObject(rawActions || {}), dispatch)
 	const update = buildUpdate(actions, effects)
 	const react = Reaction.fromObject(rawReactions || {})
 	const reduce = Action.kase(update, actions)
