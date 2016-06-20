@@ -22,7 +22,7 @@ const createStore = ({
 	assert(typeof buildUpdate === 'function', '1st argument: Must provide an `update` function as part of object')
 	assert(typeof onUpdate === 'function', '2nd argument: must be a function')
 
-	let state = init()
+	let state = {}
 	let isDispatching = false
 
 	const dispatch = action => {
@@ -65,6 +65,22 @@ const createStore = ({
 	const update = buildUpdate(actions, effects)
 	const react = Reaction.fromObject(rawReactions || {})
 	const reduce = Action.kase(update, actions)
+
+	// INITIALIZATION (needs work)
+	//
+	const initial = init(actions, effects)
+	const [ initState, initCmd ] = isArray(initial) ? initial : [ initial, effects.none() ]
+
+	// update existing state
+	state = initState
+
+	const [ cmdName, ...cmdArgs ] = initCmd
+
+	const effect = effects[cmdName]
+	assert(effect, `Missing effect: ${cmdName}`)
+
+	// side effect!
+	effect.run(...cmdArgs)
 
 	onUpdate({
 		actions,
