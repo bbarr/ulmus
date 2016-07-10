@@ -1,6 +1,6 @@
 {
   "name": "ulmus",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "A minimal Elm-inspired state manager with zero dependencies.",
   "main": "build/index.js",
   "scripts": {

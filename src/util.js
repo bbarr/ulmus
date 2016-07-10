@@ -7,7 +7,7 @@ export const path = (nodes, obj) => {
 
 export const curryN = (n, fn) => {
 	const call = (args, ...newArgs) => {
-		const allArgs = args.concat(newArgs)
+		const allArgs = args.concat(newArgs).slice(0, n)
 		if (allArgs.length === n) return fn(...allArgs)
 		return call.bind(null, allArgs)
 	}
