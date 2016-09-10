@@ -49,8 +49,7 @@ const createStore = ({
 			state: newState
 		}
 
-		// possible action call
-		setTimeout(() => react(newState, state, actions), 0)
+		react(newState, state, actions)
 
 		// update existing state
 		state = newState
