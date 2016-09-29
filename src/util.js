@@ -1,24 +1,14 @@
 
-export const path = (nodes, obj) => {
+// @flow
+
+export const path = (nodes: Array<any>, obj: any): any => {
 	return nodes.reduce((current, node) => {
 		return current[node]
 	}, obj)
 }
 
-export const curryN = (n, fn) => {
-	const call = (args, ...newArgs) => {
-		const allArgs = args.concat(newArgs).slice(0, n)
-		if (allArgs.length === n) return fn(...allArgs)
-		return call.bind(null, allArgs)
-	}
-	return call.bind(null, [])
+export const mapObject = (mapper: Function, object: Object) => {
+  return Object.keys(object).reduce((mapped, key) => {
+    return { ...mapped, [key]: mapper(object[key], key) }
+  }, {})
 }
-
-export const difference = (arr1, arr2) => {
-	return arr1.reduce((diff, item, i) => {
-		return arr2.indexOf(item) === -1 ?
-			[ ...diff, item ] : diff
-	}, [])
-}
-
-export const isArray = x => x instanceof Array
