@@ -2,8 +2,7 @@
 A minimal Elm-inspired state manager with zero dependencies.
 
 ## The big idea
-There is a state. This state represents everything that needs to be represented in the application.
-There is only one way 
+There is a state. This state represents everything that needs to be represented in the application. Any side-effects must be triggered as an **effect**, or in a **reaction**, which is like an effect that can be triggered globally when any part of the state updates, ie: a new user logs in, respond by trashing the old list of todos and fetching the new user's list.
 
 Ulmus takes the following view of application state:
 
@@ -15,35 +14,47 @@ Ulmus takes the following view of application state:
 6. These **reactions** also must call actions to move the state along.
 7. Thus, the "render" step of the process, where you render your React application, is simply a **reaction** to the root of the state.
 
-## Example - Todos
+## Example - Counter
 
 ```javascript
 
-import React from 'react'
-import ReactDom from 'react-dom'
-import ulmus from 'ulmus'
+import createStore from 'ulmus'
 
-import App from './app.jsx'
-
-ulmus({
+const counter = createStore({
 
   init: () => 0,
   
   actions: {
     inc: ({ state }) => state + 1,
-    dec: ({ state }) => state - 1,
+    dec: ({ state, effects }) => [ state - 1, effects.log('Wow, decremented!') ],
+    set: n => n
+  },
+  
+  effects: {
+    log: console.log
   },
 
   reactions: {
 
     '*': (newState, oldState, actions) => {
-      ReactDom.render(
-        <App state={newState} actions={actions} />,
-        document.body
-      )
+      console.log('was ', oldState, ', now ', newState)
     }
   }
 })
+
+console.log(counter.getState()) // => 0
+
+counter.set(5)
+// LOGS: 'was 0, now 5'
+counter.inc()
+// LOGS: 'was 5, now 6'
+counter.inc()
+// LOGS: 'was 6, now 7'
+counter.dec()
+// LOGS: 'Wow, decremented!'
+// LOGS: 'was 7, now 6'
+
+console.log(counter.getState()) // => 6
 
 ```
 
