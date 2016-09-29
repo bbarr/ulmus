@@ -44,13 +44,13 @@ const counter = createStore({
 
 console.log(counter.getState()) // => 0
 
-counter.set(5)
+counter.actions.set(5)
 // LOGS: 'was 0, now 5'
-counter.inc()
+counter.actions.inc()
 // LOGS: 'was 5, now 6'
-counter.inc()
+counter.actions.inc()
 // LOGS: 'was 6, now 7'
-counter.dec()
+counter.actions.dec()
 // LOGS: 'Wow, decremented!'
 // LOGS: 'was 7, now 6'
 
