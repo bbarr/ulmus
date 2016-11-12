@@ -1,14 +1,7 @@
 
-import { 
-  Action, 
-  Updater,
-  Command,
-  Effect,
-  Key,
-  InitConfig
-} from './types'
+import { Action, Updater, Command, Effect, Key, InitConfig } from './types'
 
-import { path, mapObject } from './util'
+import { assocPath, path, mapObject } from './util'
 
 export const createCommand = (key: Key): Command => 
   (...args) => [ key, ...args ]
@@ -16,16 +9,7 @@ export const createCommand = (key: Key): Command =>
 export const buildCommands = obj => {
   return Object.keys(obj).reduce((mapped, key) => {
     return { ...mapped, [key]: createCommand(key) }
-  }, { none: () => [] })
-}
-
-const swapForArmedActions = (list, armedActions) => {
-  return list.map(item => {
-    if (typeof item === 'function') {
-      return armedActions[item.key]
-    }
-    return item
-  })
+  }, {})
 }
 
 export const buildDispatch = (
@@ -35,40 +19,47 @@ export const buildDispatch = (
   commands, 
   effects, 
   armedReactions,
-  getArmedActions
+  getArmedActions,
+  getSubscriptions
 ) => {
 
   let isDispatching = false
 
   const dispatch = (action, ...args) => {
 
-    if (isDispatching) 
+    if (isDispatching)
       throw new Error('Dispatch already running. Make sure effects and reactions are calling subsequent actions asynchronously! ' + JSON.stringify(action, args))
     isDispatching = true
 
-    // curry
-    console.log('should we curry?', args, action)
-    if (args.length + 1 < action.expected) 
-      return dispatch.bind(null, action, ...args)
-
-    const result = actions[action.key](
-      ...args,
-      { actions, commands, state: getState() }
+    const result = path(action.nest, actions)[action.key](
+      ...args
+    )(
+      { 
+        actions: path(action.nest, getArmedActions()), 
+        state: path(action.nest, getState()),
+        commands
+      }
     )
  
     const hasCommand = Array.isArray(result)
     const newState = hasCommand ? result[0] : result 
     const newCmd = hasCommand ? result[1] : commands.none()
 
-    const oldState = getState()
-    
-    setState(newState)
+    const oldRootState = getState()
+    const oldState = path(action.nest, getState())
 
-    // side-effect
-    newCmd.length && effects[newCmd[0]](...swapForArmedActions(newCmd.slice(1), getArmedActions()))
+    const newRootState = assocPath(action.nest, newState, getState())
 
-    // side-effect
-    armedReactions(newState, oldState, getArmedActions())
+    setState(newRootState)
+
+    // side-effect - async
+    setImmediate(() => newCmd.length && effects[newCmd[0]](...newCmd.slice(1)))
+
+    // side-effect - async
+    setImmediate(() => armedReactions(newRootState, oldRootState, getArmedActions()))
+
+    // side-effect - sync (for rendering)
+    getSubscriptions().forEach(s => s())
 
     isDispatching = false
   }
@@ -76,61 +67,83 @@ export const buildDispatch = (
   return dispatch
 }
 
-const armAction = (dispatch: Function, update: Function, key: Key): Function => {
-  return dispatch.bind(null, { expected: update.length, key })
+const armAction = (dispatch: Function, update: Function, key: Key, nest: string[]): Function => {
+  const armed = dispatch.bind(null, { key, nest })
+  armed.raw = update
+  return armed
 }
 
-export const armActions = (actions, dispatch) => 
-  mapObject(armAction.bind(null, dispatch), actions)
+export const armActions = (actions, dispatch, nest=[]) => 
+  mapObject((fn, key) => {
+    if (typeof fn === 'function') 
+      return armAction(dispatch, fn, key, nest)
+    else
+      return armActions(fn, dispatch, nest.concat(key))
+  }, actions)
 
 const armReactions = reactions => {
   const keys = Object.keys(reactions)
-  return (newState, oldState, actions) => {
+  return (newState, oldState, actions, getState) => {
     keys.forEach(key => {
-      console.log('in reactions', key, newState, oldState)
-      if (key === '*' && newState !== oldState) {
-        return reactions[key](newState, oldState, actions)
-      }
-      let newVal = path(key.split('.'), newState)   
-      let oldVal = path(key.split('.'), oldState)   
+      let newVal = key === '*' ? newState : path(key.split('.'), newState)
+      let oldVal = key === '*' ? oldState : path(key.split('.'), oldState) 
       if (newVal !== oldVal)
-        return reactions[key](newVal, oldVal, actions)
+        return reactions[key](newVal, oldVal, actions, newState)
     })
   }
 }
 
 const INIT_ACTION_KEY = '__INIT_ACTION_KEY__'
 
-export default ({ init, actions, effects, reactions }: InitConfig): any => {
+export const createStore = ({ init, actions, effects, reactions, onChange }: InitConfig): any => {
 
   let state = null
+  let subscriptions = []
 
   const getState = () => state
   const setState = newState => state = newState
 
-  const commands = buildCommands(effects)
+  const effectsWithDefaults = {
+    ...effects,
+    none: () => true, 
+    batch: (...cmds) => {
+      cmds.forEach(([ name, ...args ]) => {
+        effectsWithDefaults[name](...args)
+      })
+    }
+  }
+
+  const commands = buildCommands(effectsWithDefaults)
   const armedReactions = armReactions(reactions)
   const getArmedActions = () => armedActions
+  const getSubscriptions = () => subscriptions
+  const subscribe = fn => {
+    subscriptions.push(fn)
+    const i = subscriptions.length
+    return () => subscriptions.splice(i, 1)
+  }
 
-  const completeActions = { ...actions, [INIT_ACTION_KEY]: init }
+  const completeActions = { ...actions, [INIT_ACTION_KEY]: () => init }
 
   const dispatch = buildDispatch(
     getState,
     setState,
     completeActions,
     commands,
-    effects,
+    effectsWithDefaults,
     armedReactions,
-    getArmedActions
+    getArmedActions,
+    getSubscriptions
   )
 
   const armedActions = armActions(completeActions, dispatch)
 
   // initialize!
-  armedActions[INIT_ACTION_KEY]({ actions: completeActions, effects })
+  armedActions[INIT_ACTION_KEY]({ actions: armedActions, commands })
 
   return {
     getState,
+    subscribe,
     actions: armedActions
   }
 }

@@ -20,14 +20,31 @@ Ulmus takes the following view of application state:
 
 import createStore from 'ulmus'
 
+type State = number
+type Command = Array<any>
+type ActionResult = 
+    State,
+  | [ State, Command ]
+
+type Context = {
+  state: number,
+  commands: any,
+  actions: any
+}
+
 const counter = createStore({
 
   init: () => 0,
   
   actions: {
-    inc: ({ state }) => state + 1,
-    dec: ({ state, effects }) => [ state - 1, effects.log('Wow, decremented!') ],
-    set: n => n
+
+    inc: ({ state }: Context): ActionResult => 
+      state + 1,
+
+    dec: ({ state, effects }: Context): ActionResult => 
+      [ state - 1, effects.log('Wow, decremented!') ],
+
+    set: (n: State): ActionResult => n
   },
   
   effects: {

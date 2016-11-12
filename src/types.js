@@ -27,5 +27,6 @@ export type InitConfig = {
   init: Updater,
   actions: RawActionMap,
   effects: RawEffectMap,
-  reactions: Object
+  reactions: Object,
+  onChange: Function
 }

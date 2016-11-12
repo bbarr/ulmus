@@ -1,7 +1,8 @@
 {
   "name": "ulmus",
-  "version": "0.0.6",
+  "version": "0.1.0",
   "description": "A minimal Elm-inspired state manager with zero dependencies.",
+  "main": "build",
   "scripts": {
     "dev": "babel --watch=./src --out-dir=./build --presets es2015,stage-0",
     "test": "./node_modules/.bin/mocha --recursive --watch --compilers js:babel-register --reporter spec",
