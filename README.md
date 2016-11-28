@@ -1,65 +1,137 @@
 # Ulmus
 A minimal Elm-inspired state manager with zero dependencies.
 
-## The big idea
-There is a state. This state represents everything that needs to be represented in the application. Any side-effects must be triggered as an **effect**, or in a **reaction**, which is like an effect that can be triggered globally when any part of the state updates, ie: a new user logs in, respond by trashing the old list of todos and fetching the new user's list.
-
-Ulmus takes the following view of application state:
-
-1. There is a single object that acts as the state of your application.
-2. In order to change this state, you must use a well-defined **action**.
-3. This **action** will be syncronous, and always return a new state, as well as a possible **effect**
-4. This **effect** will run asynchronously and can talk to the outside world. It is often given an **action** to then call when it is done, continuing the cycle.
-5. For larger, cross-cutting dependencies to be defined on certain parts of the state, we can use **reactions** to watch a specific part of the state and run asynchronously when there is a change.
-6. These **reactions** also must call actions to move the state along.
-7. Thus, the "render" step of the process, where you render your React application, is simply a **reaction** to the root of the state.
-
-## Example - Counter
+Let's start simple:
 
 ```javascript
 
-import createStore from 'ulmus'
+import { createStore } from 'ulmus'
+
+const counter = createStore({
+  init: () => 0
+})
+
+counter.getState() // => always 0
+```
+
+Pretty boring. So let's add an `action` that will allow us to change the state, perhaps by incrementing it by 1:
+
+```javascript
+import { createStore } from 'ulmus'
 
 const counter = createStore({
 
   init: () => 0,
-  
+
   actions: {
-
-    inc: ({ state }) => 
-      state + 1,
-
-    dec: ({ state, effects }) => 
-      [ state - 1, effects.log('Wow, decremented!') ],
-
-    set: n => _ => n
-  },
-  
-  effects: {
-    log: console.log
-  },
-
-  reactions: {
-
-    '*': (newState, oldState, actions) => {
-      console.log('was ', oldState, ', now ', newState)
-    }
+    increment: () => ({ state }) => state + 1
   }
 })
 
-console.log(counter.getState()) // => 0
+counter.getState() // => 0
+
+counter.actions.increment()
+
+counter.getState() // => 1
+```
+
+Note how an action is defined as a function that simply returns another function. The first function
+is what you call from you application code, and can take as many arguments as you need. 
+The function that is returned takes a `context` object containing, 
+among other things, the current state. Whatever this function returns is the new state, 
+so for `increment`, we simply return the current state plus 1. Notice how we only have to call `increment`, but not the the returned function. This is because Ulmus stores are given a bound set of actions that will handle "dispatching" for you, and pass actions this `context` internally.
+
+Now let's say we want to simply set the counter to a specific value:
+
+```javascript
+import { createStore } from 'ulmus'
+
+const counter = createStore({
+
+  init: () => 0,
+
+  actions: {
+    increment: () => ({ state }) => state + 1,
+    set: n => _ => n
+  }
+})
+
+counter.getState() // => 0
 
 counter.actions.set(5)
-// LOGS: 'was 0, now 5'
-counter.actions.inc()
-// LOGS: 'was 5, now 6'
-counter.actions.inc()
-// LOGS: 'was 6, now 7'
-counter.actions.dec()
-// LOGS: 'Wow, decremented!'
-// LOGS: 'was 7, now 6'
 
-console.log(counter.getState()) // => 6
-
+counter.getState() // => 5
 ```
+
+Now we call the action with an argument, which is received in the first function in our action definition, and 
+then returned from the second function. We assign the `context` object to `_` as a placeholder to signal that while we are aware of the `context` being given to us, we have no use for it and will ignore it.
+
+### Them's the basics.
+
+Using the above knowledge, you can effectively write synchronous actions to your heart's content, and this will take you a fair way into any application.
+
+#### Now for the good stuff.
+
+And by good stuff, we mean mainly, Async actions. Let's say we have an HTTP endpoint that will serve a random number to GET requests.
+The key is, we don't want to introduce asynchronous anything into our actions. Whenever an action is triggered, we must have a meaningful synchronous return value, because this is way simpler to reason about and test.
+
+Let's look at how it will look first, then I will explain:
+
+```javascript
+import createStore from 'ulmus'
+import axios from 'axios' // <- HTTP client
+
+const counter = createStore({
+
+  init: () => ({ n: 0 }),
+    
+  effects: {
+    get(url, yay, boo) { axios.get(url).then(yay, boo) }
+  },
+  
+  actions: {
+    inc: () => ({ state }) => ({ n: state.n + 1 }),
+    set: n => _ => ({ n }),
+    rand: () => ({ state, commands, actions }) => {
+      return [
+        state, 
+        commands.get(
+          'http://my.api/random-number', 
+          actions.randSuccess, 
+          actions.randFailure
+        )
+      ]
+    },
+    randSuccess: n => _ => ({ n }),
+    randFailure: error => ({ state }) => ({ ...state, error })
+  }
+})
+
+counter.rand() // results in async request
+
+counter.subscribe(() => {
+  // some time later, we will see a random number logged,
+  // OR, the previous number and an `error`
+  console.log(counter.getState())
+})
+```
+
+A few new things here: 
+1. We made our state an object and put the number for our counter as property `n`. This enables us to attach the `error` message if a call to our API fails.
+2. there is now a call to `subscribe` with a callback function that will be executed every time after an action is triggered.
+3. Most importantly, actions can return a tuple of [ newState, aCommand ]. Commands are how we trigger side-effects, eventually. When we created our store, we gave it an `effects` object containing a property `get` that fired an HTTP request. This is exposed to our actions in the `commands` property on `context`. The important thing to note is: calling a command does NOT execute a side-effect. It simply returns a piece of data that Ulmus will match to the correct effect and execute asynchronously. This means, again, that commands return data. Our actions are STILL synchronous, and deal with data.
+
+The last point is probably the most important difference between Ulmus and Redux. Your actions remain synchronous, and simply modify data. They are referentially transparent. 
+
+Let's say we only want to set our counter to a positive number. If `set` is given a negative number, it should just grab a random number, which let's say will always be positive.
+
+```javascript
+set: n => ctx => {
+  if (n > 0) return { n }
+  const [ newState, randCmd ] = ctx.actions.rand(ctx)
+  return [ newState, randCmd ]
+}
+```
+
+`rand` returns its state and command, and we return it as our own. Simple composition, no side-effects, no magic.
 
