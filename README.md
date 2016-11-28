@@ -39,9 +39,9 @@ Note how an action is defined as a function that simply returns another function
 is what you call from you application code, and can take as many arguments as you need. 
 The function that is returned takes a `context` object containing, 
 among other things, the current state. Whatever this function returns is the new state, 
-so for `increment`, we simply return the current state plus 1. Notice how we only have to call `increment`, but not the the returned function. This is because Ulmus stores are given a bound set of actions that will handle "dispatching" for you, and pass actions this `context` internally.
+so for `increment`, we return the current state plus 1. Notice how we only have to call `increment`, but not the the returned function. This is because Ulmus stores are given a bound set of actions that will handle "dispatching" for you, and pass actions this `context` internally.
 
-Now let's say we want to simply set the counter to a specific value:
+Now let's say we want to set the counter to a specific value:
 
 ```javascript
 import { createStore } from 'ulmus'
@@ -72,7 +72,7 @@ Using the above knowledge, you can effectively write synchronous actions to your
 
 #### Now for the good stuff.
 
-And by good stuff, we mean mainly, Async actions. Let's say we have an HTTP endpoint that will serve a random number to GET requests.
+And by good stuff, we mean mainly, async actions. Let's say we have an HTTP endpoint that will serve a random number to GET requests.
 The key is, we don't want to introduce asynchronous anything into our actions. Whenever an action is triggered, we must have a meaningful synchronous return value, because this is way simpler to reason about and test.
 
 Let's look at how it will look first, then I will explain:
@@ -107,21 +107,33 @@ const counter = createStore({
   }
 })
 
-counter.rand() // results in async request
-
 counter.subscribe(() => {
-  // some time later, we will see a random number logged,
-  // OR, the previous number and an `error`
   console.log(counter.getState())
 })
+
+counter.actions.set(10)
+
+// logs 10
+
+counter.actions.inc()
+
+// logs 11
+
+counter.actions.rand()
+
+// eventually logs some random number, or the previous number and an error message
+
 ```
 
 A few new things here: 
+
 1. We made our state an object and put the number for our counter as property `n`. This enables us to attach the `error` message if a call to our API fails.
+
 2. there is now a call to `subscribe` with a callback function that will be executed every time after an action is triggered.
+
 3. Most importantly, actions can return a tuple of [ newState, aCommand ]. Commands are how we trigger side-effects, eventually. When we created our store, we gave it an `effects` object containing a property `get` that fired an HTTP request. This is exposed to our actions in the `commands` property on `context`. The important thing to note is: calling a command does NOT execute a side-effect. It simply returns a piece of data that Ulmus will match to the correct effect and execute asynchronously. This means, again, that commands return data. Our actions are STILL synchronous, and deal with data.
 
-The last point is probably the most important difference between Ulmus and Redux. Your actions remain synchronous, and simply modify data. They are referentially transparent. 
+The last point is probably the most important difference between Ulmus and Redux. Your actions remain synchronous, and only modify data. They are referentially transparent. 
 
 Let's say we only want to set our counter to a positive number. If `set` is given a negative number, it should just grab a random number, which let's say will always be positive.
 
